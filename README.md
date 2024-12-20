@@ -2,9 +2,7 @@
 
 Rust implementation of the pimoroni unicorn devices.
 
-Current support is focused on the galactic unicorn with embassy.
-
-There is a basic working version of the galactic unicorn with the rp_hal crate.
+Current support is focused on the cosmic unicorn with embassy.
 
 ## Current Features
 
@@ -26,7 +24,7 @@ Holds a buffer of the led matrix 2d array used by the display. Benefits for usin
 
 ## Examples
 
-Examples can be found within each respective folder of how to make use of the library and the unicorn graphics library.
+Examples show how to make use of the library and the unicorn graphics library.
 
 ## Running examples
 
@@ -34,22 +32,13 @@ Install required dependencies.
 
 ```sh
 rustup target add thumbv6m-none-eabi
-cargo install elf2uf2-rs
 cargo install probe-rs --features cli
 ```
-
-> You may need Rust nightly if running the embassy examples. Run the above command again after running `rustup install nightly`.
-
-Change directory to the sample's base directory.
-
-For example:
-
-`cd galactic-unicorn-rp/`
 
 Run the example
 
 For example:
 
-`cargo run --release --example scrolling_text`
-
-> Make sure your Pico is in boostel mode for this to succeed.
+```bash
+cargo run --target thumbv6m-none-eabi --example scrolling_text
+```

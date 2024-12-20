@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(type_alias_impl_trait)]
 
 use core::iter::Iterator;
 use core::option::Option::*;
@@ -25,16 +24,16 @@ pub mod buttons;
 pub mod pins;
 
 /// Width of the pimoroni galactic unicorn led matrix.
-pub const WIDTH: usize = 53;
+pub const WIDTH: usize = 32;
 
 /// Height of the pimoroni galactic unicorn led matrix.
-pub const HEIGHT: usize = 11;
+pub const HEIGHT: usize = 32;
 
 pub const XOSC_CRYSTAL_FREQ: u32 = 12_000_000;
 
-const ROW_COUNT: usize = 11;
+const ROW_COUNT: usize = 16;
 const BCD_FRAME_COUNT: usize = 14;
-const BCD_FRAME_BYTES: usize = 60;
+const BCD_FRAME_BYTES: usize = 72;
 const ROW_BYTES: usize = BCD_FRAME_COUNT * BCD_FRAME_BYTES;
 const BITSTREAM_LENGTH: usize = ROW_COUNT * ROW_BYTES;
 
@@ -101,7 +100,7 @@ impl<'a> GalacticUnicorn<'a> {
 
         let reg1: u16 = 0b1111111111001110;
 
-        for _ in 0..9 {
+        for _ in 0..11 {
             for i in 0..16 {
                 if reg1 & (1 << (15 - i)) != 0 {
                     column_data_pin.set_high();
@@ -242,13 +241,14 @@ impl<'a> GalacticUnicorn<'a> {
 
             ; for each row:
             ;   for each bcd frame:
-            ;            0: 00110110                           // row pixel count (minus one)
-            ;      1  - 53: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
-            ;      54 - 55: xxxxxxxx, xxxxxxxx                 // dummy bytes to dword align
-            ;           56: xxxxrrrr                           // row select bits
-            ;      57 - 59: tttttttt, tttttttt, tttttttt,      // bcd tick count (0-65536)
+            ;           0: 00111111                           // row pixel count (minus one)
+            ;           1: xxxxrrrr                           // row select bits
+            ;     2  - 65: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
+            ;     66 - 67: xxxxxxxx, xxxxxxxx                 // dummy bytes to dword align
+            ;     68 - 71: tttttttt, tttttttt, tttttttt       // bcd tick count (0-65536)
             ;
-            ;  .. and back to the start
+            ; .. and back to the start
+
 
             .wrap_target
 
@@ -258,7 +258,7 @@ impl<'a> GalacticUnicorn<'a> {
             pixels:
 
                 ; red bit
-                out x, 1       side 0  [1]       ; pull in blue bit from OSR into register x, clear clock
+                out x, 1       side 0  [1]    ; pull in blue bit from OSR into register x, clear clock
                 set pins, 0b100               ; clear data bit, blank high
                 jmp !x endb                   ; if bit was zero jump
                 set pins, 0b101               ; set data bit, blank high
@@ -285,7 +285,7 @@ impl<'a> GalacticUnicorn<'a> {
 
             jmp y-- pixels
 
-            out null, 8                    ; discard dummy bytes
+            out null, 16                    ; discard dummy bytes
 
             set pins, 0b110 [5]             ; latch high, blank high
             set pins, 0b000                 ; blank low (enable output)
@@ -305,14 +305,14 @@ impl<'a> GalacticUnicorn<'a> {
 
     fn init_bitstream() {
         // Iterate through rows and frames
-        for row in 0..HEIGHT {
+        for row in 0..16 {
             for frame in 0..BCD_FRAME_COUNT {
                 // Calculate the offset in the bitstream array for the current row and frame
                 let offset = row * ROW_BYTES + (BCD_FRAME_BYTES * frame);
 
                 unsafe {
                     // Set row pixel count and row select in the bitstream array
-                    BITSTREAM.0[offset] = (WIDTH - 1) as u8; // Row pixel count
+                    BITSTREAM.0[offset] = (64 - 1) as u8; // Row pixel count
                     BITSTREAM.0[offset + 1] = row as u8; // Row select
                 }
 
@@ -321,10 +321,10 @@ impl<'a> GalacticUnicorn<'a> {
 
                 // Split 32-bit BCD ticks into 8-bit parts and store them in the bitstream array
                 unsafe {
-                    BITSTREAM.0[offset + 56] = ((bcd_ticks & 0xff) >> 0) as u8;
-                    BITSTREAM.0[offset + 57] = ((bcd_ticks & 0xff00) >> 8) as u8;
-                    BITSTREAM.0[offset + 58] = ((bcd_ticks & 0xff0000) >> 16) as u8;
-                    BITSTREAM.0[offset + 59] = ((bcd_ticks & 0xff000000) >> 24) as u8;
+                    BITSTREAM.0[offset + 68] = ((bcd_ticks & 0xff) >> 0) as u8;
+                    BITSTREAM.0[offset + 69] = ((bcd_ticks & 0xff00) >> 8) as u8;
+                    BITSTREAM.0[offset + 70] = ((bcd_ticks & 0xff0000) >> 16) as u8;
+                    BITSTREAM.0[offset + 71] = ((bcd_ticks & 0xff000000) >> 24) as u8;
                 }
             }
         }
@@ -335,13 +335,18 @@ impl<'a> GalacticUnicorn<'a> {
         let x = x as usize;
         let y = y as usize;
 
-        if x >= WIDTH || y >= HEIGHT {
-            return;
-        }
-
         // Make those coordinates sane
-        let x = WIDTH - 1 - x;
-        let y = HEIGHT - 1 - y;
+        let mut x = WIDTH - 1 - x;
+        let mut y = HEIGHT - 1 - y;
+
+        // map coordinates into display space
+        if y < 16 {
+            // move to top half of display (which is actually the right half of the framebuffer)
+            x += 32;
+        } else {
+            // remap y coordinate
+            y -= 16;
+        }
 
         let r = (r as u16 * brightness as u16) >> 8;
         let g = (g as u16 * brightness as u16) >> 8;

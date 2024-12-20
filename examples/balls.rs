@@ -1,19 +1,14 @@
-//! Example with basic scrolling text.
-//!
-//!
-//!
-
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
 use embassy_executor::Spawner;
 use embassy_time::Instant;
 use embassy_time::Timer;
 
-use defmt_rtt as _;
+use defmt as _;
+use defmt::info;
 use galactic_unicorn_embassy::pins::UnicornSensorPins;
-use panic_halt as _;
+use {defmt_rtt as _, panic_probe as _};
 
 use embedded_graphics_core::{pixelcolor::Rgb888, prelude::Point};
 
@@ -24,9 +19,12 @@ use galactic_unicorn_embassy::GalacticUnicorn;
 use galactic_unicorn_embassy::{HEIGHT, WIDTH};
 
 #[embassy_executor::main]
-async fn main(spawner: Spawner) {
+async fn main(_spawner: Spawner) {
+    info!("Starting Cosmic Unicorn");
+
     let p = embassy_rp::init(Default::default());
 
+    info!("Init done.");
     let display_pins = UnicornDisplayPins {
         column_clock: p.PIN_13,
         column_data: p.PIN_14,
@@ -42,19 +40,22 @@ async fn main(spawner: Spawner) {
         light_sensor: p.PIN_28,
     };
 
+    info!("Starting Cosmic Unicorn");
     let mut gu = GalacticUnicorn::new(p.PIO0, display_pins, sensor_pins, p.ADC, p.DMA_CH0);
 
     let mut graphics = UnicornGraphics::<WIDTH, HEIGHT>::new();
-    let mut heat: [[f32; 13]; 53] = [[0.0; 13]; 53];
+    let mut heat: [[f32; HEIGHT + 2]; WIDTH] = [[0.0; HEIGHT + 2]; WIDTH];
 
     gu.set_pixels(&graphics);
-
-    gu.set_brightness(150);
+    gu.set_brightness(100);
 
     loop {
-        for y in 0..11 {
-            for x in 0..53 {
-                let coord = Point { x, y };
+        for y in 0..HEIGHT {
+            for x in 0..WIDTH {
+                let coord = Point {
+                    x: x as i32,
+                    y: y as i32,
+                };
 
                 let x = x as usize;
                 let y = y as usize;
@@ -76,7 +77,7 @@ async fn main(spawner: Spawner) {
                 if x == 0 {
                     heat[x][y] =
                         (heat[x][y] + heat[x][y + 2] + heat[x][y + 1] + heat[x + 1][y + 1]) / 4.0;
-                } else if x == 52 {
+                } else if x == WIDTH - 1 {
                     heat[x][y] =
                         (heat[x][y] + heat[x][y + 2] + heat[x][y + 1] + heat[x - 1][y + 1]) / 4.0;
                 } else {
@@ -96,20 +97,20 @@ async fn main(spawner: Spawner) {
         gu.set_pixels(&graphics);
 
         // clear the bottom row and then add a new fire seed to it
-        for x in 0..53 {
-            heat[x as usize][11] = 0.0;
+        for x in 0..WIDTH {
+            heat[x][HEIGHT] = 0.0;
         }
 
         // add a new random heat source
         for _ in 0..5 {
             let ticks = Instant::now().as_ticks();
-            let px: usize = ticks as usize % 51 + 1;
-            heat[px][11] = 1.0;
-            heat[px + 1][11] = 1.0;
-            heat[px - 1][11] = 1.0;
-            heat[px][12] = 1.0;
-            heat[px + 1][12] = 1.0;
-            heat[px - 1][12] = 1.0;
+            let px: usize = ticks as usize % 30 + 1;
+            heat[px][HEIGHT] = 1.0;
+            heat[px + 1][HEIGHT] = 1.0;
+            heat[px - 1][HEIGHT] = 1.0;
+            heat[px][32] = 1.0;
+            heat[px + 1][HEIGHT + 1] = 1.0;
+            heat[px - 1][HEIGHT + 1] = 1.0;
         }
 
         Timer::after_millis(50).await;

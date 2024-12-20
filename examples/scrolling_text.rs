@@ -1,11 +1,5 @@
-//! Example with basic scrolling text.
-//!
-//!
-//!
-
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
 use core::fmt::Write;
 
@@ -13,8 +7,7 @@ use embassy_executor::Spawner;
 use embassy_rp::gpio::{Input, Pull};
 use embassy_time::Timer;
 
-use defmt_rtt as _;
-use panic_halt as _;
+use {defmt_rtt as _, panic_probe as _};
 
 use embedded_graphics::mono_font::{ascii::FONT_6X10, MonoTextStyle};
 use embedded_graphics::text::Text;
@@ -26,12 +19,12 @@ use embedded_graphics_core::{
 
 use unicorn_graphics::UnicornGraphics;
 
-use galactic_unicorn_embassy::pins::{UnicornButtonPins, UnicornDisplayPins};
+use galactic_unicorn_embassy::pins::{UnicornButtonPins, UnicornDisplayPins, UnicornSensorPins};
 use galactic_unicorn_embassy::GalacticUnicorn;
 use galactic_unicorn_embassy::{HEIGHT, WIDTH};
 
 #[embassy_executor::main]
-async fn main(spawner: Spawner) {
+async fn main(_spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
 
     let display_pins = UnicornDisplayPins {
@@ -67,10 +60,10 @@ async fn main(spawner: Spawner) {
     gu.set_pixels(&graphics);
 
     // keep track of scroll position
-    let mut x: f32 = -53.0;
+    let mut x: f32 = -32.0;
 
     // Create a new character style
-    let style = MonoTextStyle::new(&FONT_6X10, Rgb888::CSS_PURPLE);
+    let style = MonoTextStyle::new(&FONT_6X10, Rgb888::CSS_YELLOW);
 
     let default_message = "Pirate. Monkey. Robot. Ninja.";
     let mut message = heapless::String::<256>::new();
@@ -104,12 +97,12 @@ async fn main(spawner: Spawner) {
         let width = message.len() * style.font.character_size.width as usize;
         x += speed;
         if x > width as f32 {
-            x = -53.0;
+            x = -32.0;
         }
 
         graphics.fill(Rgb888::new(10, 10, 10));
 
-        Text::new(&message, Point::new(0 - x as i32, 7), style)
+        Text::new(&message, Point::new(0 - x as i32, 32 / 2 - 5 + 7), style)
             .draw(&mut graphics)
             .unwrap();
 
